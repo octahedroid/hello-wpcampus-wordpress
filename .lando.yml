@@ -1,0 +1,6 @@
+name: hello-wpcampus-wordpress
+recipe: pantheon
+config:
+  framework: wordpress
+  site: hello-wpcampus-wordpress
+  id: 4fc11a3a-7264-442e-851b-0aebb9a4af62
