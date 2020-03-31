@@ -9,27 +9,68 @@ require plugin_dir_path(__FILE__) . 'vendor/autoload.php';
 
 add_action('admin_menu', 'register_web_hooks_admin_page');
 
+const BUILD_HOOK_OPTION = '_build_hooks_webhook';
+const BUILD_HOOK_SETTINGS_OPTION = '_build_hooks_settings';
+const BUILD_HOOK_TRIGGER_OPTION ='_build_hooks_trigger';
+
+function bypass_option() {
+  return in_array(
+    current_user_role(),
+    [
+      'super_admin',
+      'administrator'
+    ]
+  );
+}
+
+function current_user_role() {
+  $current_user = wp_get_current_user();
+
+  return $current_user->roles[0];
+}
+
+function settings_option() {
+  if (bypass_option()) {
+    return true;
+  }
+
+  $settings = get_option(BUILD_HOOK_SETTINGS_OPTION, []);
+
+  return in_array(current_user_role(), $settings);
+}
+
+function trigger_option() {
+  if (bypass_option()) {
+    return true;
+  }
+
+  $trigger = get_option(BUILD_HOOK_TRIGGER_OPTION, []);
+
+  return in_array(current_user_role(), $trigger);
+}
+
 function register_web_hooks_admin_page()
 {
-  $settings_option = '_settings_webhook';
-  $trigger_option = '_trigger_webhook';
-  $settings = get_option($settings_option);
-  $trigger = get_option($trigger_option);
-  $current_user = wp_get_current_user();
-  $current_role = $current_user->roles[0];
-  add_menu_page(
-      'Build Hooks',
-      'Build Hooks',
-      'edit_pages',
+  if (trigger_option()) {
+      add_menu_page(
+          'Build Hooks',
+          'Build Hooks',
+          'edit_pages',
+          'build-hooks',
+          'build_hooks',
+          'dashicons-cloud'
+      );
+    }
+
+  if (settings_option()) {
+    add_submenu_page(
       'build-hooks',
-      'build_hooks',
-      'dashicons-cloud'
-  );
-  if (in_array($current_role, $trigger)) {
-    add_submenu_page('build-hooks', 'Web Hooks', 'Web Hooks', 'edit_pages', 'build-hooks', 'build_hooks');
-  }
-  if (in_array($current_role, $settings)) {
-    add_submenu_page('build-hooks', 'Settings', 'Settings', 'edit_pages', 'build-hooks-settings', 'build_hooks_settings');
+      'Settings',
+      'Settings',
+      'edit_pages',
+      'build-hooks-settings',
+      'build_hooks_settings'
+    );
   }
 }
 
@@ -45,46 +86,40 @@ if (isset($_POST['action'])) {
 
 function setOptionsPantheon($data)
 {
-    $build_hook_option = '_build_hooks_webhook';
-    $settings_option = '_settings_webhook';
-    $trigger_option = '_trigger_webhook';
-    $web_hook = $data[$build_hook_option];
-    $settings = $data[$settings_option];
-    $trigger = $data[$trigger_option];
+    $web_hook = $data[BUILD_HOOK_OPTION];
+    $settings = $data[BUILD_HOOK_SETTINGS_OPTION];
+    $trigger = $data[BUILD_HOOK_TRIGGER_OPTION];
     
     if ($web_hook) {
-      update_option($build_hook_option, $web_hook);
+      update_option(BUILD_HOOK_OPTION, $web_hook);
     } else {
-      update_option($build_hook_option, null);
+      update_option(BUILD_HOOK_OPTION, null);
     }
     if ($settings) {
-      update_option($settings_option, $settings);
+      update_option(BUILD_HOOK_SETTINGS_OPTION, $settings);
     } else {
-      update_option($settings_option, null);
+      update_option(BUILD_HOOK_SETTINGS_OPTION, null);
     }
     if ($trigger) {
-      update_option($trigger_option, $trigger);
+      update_option(BUILD_HOOK_TRIGGER_OPTION, $trigger);
     } else {
-      update_option($trigger_option, null);
+      update_option(BUILD_HOOK_TRIGGER_OPTION, null);
     }
 }
 
 function build_hooks()
 {
-    $build_hook_option = '_build_hooks_webhook';
-    $trigger_option = '_trigger_webhook';
-    $settings_option = '_settings_webhook';
-    $url = get_option($build_hook_option);
+    $url = get_option(BUILD_HOOK_OPTION);
+    $trigger = get_option(BUILD_HOOK_TRIGGER_OPTION);
+    $settings = get_option(BUILD_HOOK_SETTINGS_OPTION);
     $current_user = wp_get_current_user();
     $current_role = $current_user->roles[0];
-    $trigger = get_option($trigger_option);
-    $settings = get_option($settings_option);
 
     ?>
       <div class="wrap">
         <h1>Build Hooks</h1>
         ​<hr />
-        <h2>Web Hooks</h2>
+        <h2>Web Hook</h2>
           <table class="form-table">
             <tbody>
               <tr>
@@ -92,22 +127,22 @@ function build_hooks()
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Current Webhook</legend>
-                      <input type="text" class="full-input" name="<?php echo $build_hook_option ?>" disabled read-only value="<?php echo $url ?>" size="96">
+                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_OPTION ?>" disabled read-only value="<?php echo $url ?>" size="96">
                   </fieldset>
                 </td>
               </tr>
             </tbody>
           </table>
-      <?php if(in_array($current_role, $trigger)||in_array($current_role, $settings)) : ?>
-        <hr />
-        <h2>Trigger Hooks</h2>
-        <form method="post" action="$site_url/wp-admin/admin.php?page=build-hooks" novalidate="novalidate">
-          <div class="submit">
-            <input name="action" value="trigger_build" type="hidden">
-            <input name="submit" id="submit" $disabled class="button button-primary" value="Trigger Build" type="submit">
-          </div>
-        </form>
-      <?php endif; ?>
+          <?php if(trigger_option()||settings_option()) : ?>
+          <hr />
+          <h2>Trigger</h2>
+          <form method="post" action="/wp-admin/admin.php?page=build-hooks" novalidate="novalidate">
+            <div class="submit">
+              <input name="action" value="trigger_build" type="hidden">
+              <input name="submit" id="submit" <?php if (!$url) { echo "disabled=disabled"; } ?> class="button button-primary" value="Trigger Build" type="submit">
+            </div>
+          </form>
+          <?php endif; ?>
       </div>
     <?php
 
@@ -115,12 +150,9 @@ function build_hooks()
 
 function build_hooks_settings()
 {
-    $build_hook_option = '_build_hooks_webhook';
-    $settings_option = '_settings_webhook';
-    $trigger_option = '_trigger_webhook';
-    $url = get_option($build_hook_option);
-    $settings = get_option($settings_option);
-    $trigger = get_option($trigger_option);
+    $url = get_option(BUILD_HOOK_OPTION);
+    $settings = get_option(BUILD_HOOK_SETTINGS_OPTION);
+    $trigger = get_option(BUILD_HOOK_TRIGGER_OPTION);
     $roles = get_editable_roles();
 
     ?>
@@ -136,7 +168,7 @@ function build_hooks_settings()
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Webhook</legend>
-                      <input type="text" class="full-input" name="<?php echo $build_hook_option ?>" value="<?php echo $url ?>" size="96">
+                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_OPTION ?>" value="<?php echo $url ?>" size="96">
                   </fieldset>
                 </td>
               </tr>
@@ -152,11 +184,11 @@ function build_hooks_settings()
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Roles</legend>
-                    <input type="hidden" name="<?php echo $settings_option ?>[]" value="administrator">
+                    <input type="hidden" name="<?php echo BUILD_HOOK_SETTINGS_OPTION ?>[]" value="administrator">
                       <?php foreach ($roles as $key => $role) {
                         ?>
-                          <label for="<?php echo $settings_option.'_'.$key ?>">
-                            <input type="checkbox" <?php echo $key == 'administrator'?'checked disabled':'' ?> <?php echo in_array($key, $settings) ?'checked':'' ?> name="<?php echo $settings_option ?>[]" id="<?php echo $settings_option.'_'.$key ?>" value="<?php echo $key ?>"> <?php echo $role['name'] ?> 
+                          <label for="<?php echo BUILD_HOOK_SETTINGS_OPTION.'_'.$key ?>">
+                            <input type="checkbox" <?php echo $key == 'administrator'?'checked disabled':'' ?> <?php echo in_array($key, $settings) ?'checked':'' ?> name="<?php echo BUILD_HOOK_SETTINGS_OPTION ?>[]" id="<?php echo BUILD_HOOK_SETTINGS_OPTION .'_'.$key ?>" value="<?php echo $key ?>"> <?php echo $role['name'] ?>
                           </label><br />
                         <?php
                       } ?>
@@ -174,11 +206,11 @@ function build_hooks_settings()
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Roles</legend>
-                    <input type="hidden" name="<?php echo $trigger_option ?>[]" value="administrator">
+                    <input type="hidden" name="<?php echo BUILD_HOOK_TRIGGER_OPTION ?>[]" value="administrator">
                       <?php foreach ($roles as $key => $role) {
                         ?>
-                          <label for="<?php echo $trigger_option.'_'.$key ?>">
-                            <input type="checkbox" <?php echo $key == 'administrator'?'checked disabled':'' ?> <?php echo in_array($key, $trigger) ?'checked':'' ?> name="<?php echo $trigger_option ?>[]" id="<?php echo $trigger_option.'_'.$key ?>" value="<?php echo $key ?>"> <?php echo $role['name'] ?> 
+                          <label for="<?php echo BUILD_HOOK_TRIGGER_OPTION.'_'.$key ?>">
+                            <input type="checkbox" <?php echo $key == 'administrator'?'checked disabled':'' ?> <?php echo in_array($key, $trigger) ?'checked':'' ?> name="<?php echo BUILD_HOOK_TRIGGER_OPTION ?>[]" id="<?php echo $trigger_option.'_'.$key ?>" value="<?php echo $key ?>"> <?php echo $role['name'] ?>
                           </label><br />
                         <?php
                       } ?>
@@ -194,15 +226,12 @@ function build_hooks_settings()
         </form>
       </div>
     <?php
-
 }
 
 function trigger_build()
 {
-    // @TODO store using a settings form
     $option_name = '_build_hooks_webhook';
     $url = get_option($option_name);
-    // $url = 'https://webhook.gatsbyjs.com/hooks/data_source/publish/2a931035-e412-4970-ae71-0eddefcea553';
 
     $client = new \GuzzleHttp\Client([
         'headers' => ['Content-Type' => 'application/json'],
