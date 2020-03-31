@@ -86,34 +86,18 @@ if (isset($_POST['action'])) {
 
 function setOptionsPantheon($data)
 {
-    $web_hook = $data[BUILD_HOOK_OPTION];
-    $settings = $data[BUILD_HOOK_SETTINGS_OPTION];
-    $trigger = $data[BUILD_HOOK_TRIGGER_OPTION];
-    
-    if ($web_hook) {
-      update_option(BUILD_HOOK_OPTION, $web_hook);
-    } else {
-      update_option(BUILD_HOOK_OPTION, null);
-    }
-    if ($settings) {
-      update_option(BUILD_HOOK_SETTINGS_OPTION, $settings);
-    } else {
-      update_option(BUILD_HOOK_SETTINGS_OPTION, null);
-    }
-    if ($trigger) {
-      update_option(BUILD_HOOK_TRIGGER_OPTION, $trigger);
-    } else {
-      update_option(BUILD_HOOK_TRIGGER_OPTION, null);
-    }
+    $web_hook = $data[BUILD_HOOK_OPTION]?$data[BUILD_HOOK_OPTION]:null;
+    $settings = $data[BUILD_HOOK_SETTINGS_OPTION]?$data[BUILD_HOOK_SETTINGS_OPTION]:null;
+    $trigger = $data[BUILD_HOOK_TRIGGER_OPTION]?$data[BUILD_HOOK_TRIGGER_OPTION]:null;
+
+    update_option(BUILD_HOOK_OPTION, $web_hook);
+    update_option(BUILD_HOOK_SETTINGS_OPTION, $settings);
+    update_option(BUILD_HOOK_TRIGGER_OPTION, $trigger);
 }
 
 function build_hooks()
 {
     $url = get_option(BUILD_HOOK_OPTION);
-    $trigger = get_option(BUILD_HOOK_TRIGGER_OPTION);
-    $settings = get_option(BUILD_HOOK_SETTINGS_OPTION);
-    $current_user = wp_get_current_user();
-    $current_role = $current_user->roles[0];
 
     ?>
       <div class="wrap">
@@ -145,7 +129,6 @@ function build_hooks()
           <?php endif; ?>
       </div>
     <?php
-
 }
 
 function build_hooks_settings()
