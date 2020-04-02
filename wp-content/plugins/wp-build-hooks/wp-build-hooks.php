@@ -9,9 +9,22 @@ require plugin_dir_path(__FILE__) . 'vendor/autoload.php';
 
 add_action('admin_menu', 'register_web_hooks_admin_page');
 
-const BUILD_HOOK_OPTION = '_build_hooks_webhook';
+const BUILD_HOOK_TYPES = [
+  'circle_ci'=>"CircleCI",
+  'gatsby'=> 'Gatsby Cloud',
+  'netlify'=>'Netlify',
+];
+const BUILD_HOOK_TYPE_OPTION = '_build_hooks_type';
+const BUILD_HOOK_OPTION = '_build_hooks_';
+const BUILD_HOOK_CIRCLECI_REPO_OPTION = '_build_hooks_circle_ci_repository';
+const BUILD_HOOK_CIRCLECI_JOB_OPTION = '_build_hooks_circle_ci_job';
 const BUILD_HOOK_SETTINGS_OPTION = '_build_hooks_settings';
 const BUILD_HOOK_TRIGGER_OPTION ='_build_hooks_trigger';
+
+function build_hook_option() {
+  $type = get_option(BUILD_HOOK_TYPE_OPTION);
+  return get_option(BUILD_HOOK_OPTION.$type);
+}
 
 function bypass_option() {
   return in_array(
@@ -86,18 +99,30 @@ if (isset($_POST['action'])) {
 
 function setOptionsPantheon($data)
 {
-    $web_hook = $data[BUILD_HOOK_OPTION]?$data[BUILD_HOOK_OPTION]:null;
+    $type = $data[BUILD_HOOK_TYPE_OPTION]?$data[BUILD_HOOK_TYPE_OPTION]:null;
     $settings = $data[BUILD_HOOK_SETTINGS_OPTION]?$data[BUILD_HOOK_SETTINGS_OPTION]:null;
     $trigger = $data[BUILD_HOOK_TRIGGER_OPTION]?$data[BUILD_HOOK_TRIGGER_OPTION]:null;
+    $circleci_repo = $data[BUILD_HOOK_CIRCLECI_REPO_OPTION]?$data[BUILD_HOOK_CIRCLECI_REPO_OPTION]:null;
+    $circleci_job = $data[BUILD_HOOK_CIRCLECI_JOB_OPTION]?$data[BUILD_HOOK_CIRCLECI_JOB_OPTION]:null;
 
-    update_option(BUILD_HOOK_OPTION, $web_hook);
+    if($type && $type!= 'circle_ci'){
+      $web_hook = $data[BUILD_HOOK_OPTION.$type]?$data[BUILD_HOOK_OPTION.$type]:null;
+      update_option(BUILD_HOOK_OPTION.$type, $web_hook);
+    }
+
+    update_option(BUILD_HOOK_TYPE_OPTION, $type);
+    update_option(BUILD_HOOK_CIRCLECI_REPO_OPTION, $circleci_repo);
+    update_option(BUILD_HOOK_CIRCLECI_JOB_OPTION, $circleci_job);
     update_option(BUILD_HOOK_SETTINGS_OPTION, $settings);
     update_option(BUILD_HOOK_TRIGGER_OPTION, $trigger);
 }
 
 function build_hooks()
 {
-    $url = get_option(BUILD_HOOK_OPTION);
+  $type = get_option(BUILD_HOOK_TYPE_OPTION);
+  $url = build_hook_option();
+  $circleci_repo = get_option(BUILD_HOOK_CIRCLECI_REPO_OPTION);
+  $circleci_job = get_option(BUILD_HOOK_CIRCLECI_JOB_OPTION);
 
     ?>
       <div class="wrap">
@@ -106,15 +131,23 @@ function build_hooks()
         <h2>Web Hook</h2>
           <table class="form-table">
             <tbody>
+            <?php if($type ): ?>
               <tr>
                 <th scope="row">Current Webhook</th>
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Current Webhook</legend>
-                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_OPTION ?>" disabled read-only value="<?php echo $url ?>" size="96">
-                  </fieldset>
+                    <?php if($type && $type!= 'circle_ci') : ?>
+                      <input type="text" class="full-input" disabled read-only value="<?php echo $url ?>" size="96">
+                    <?php endif; ?>
+                    <?php if($type && $type== 'circle_ci') : ?>
+                      <input type="text" class="input" disabled read-only value="<?php echo $circleci_repo ?>" size="96">
+                      <input type="text" class="input" disabled read-only value="<?php echo $circleci_job ?>" size="96">
+                    <?php endif; ?>
+                    </fieldset>
                 </td>
               </tr>
+              <?php endif; ?>
             </tbody>
           </table>
           <?php if(trigger_option()||settings_option()) : ?>
@@ -133,28 +166,68 @@ function build_hooks()
 
 function build_hooks_settings()
 {
-    $url = get_option(BUILD_HOOK_OPTION);
+    $type = get_option(BUILD_HOOK_TYPE_OPTION);
+    $url = build_hook_option();
+    $circleci_repo = get_option(BUILD_HOOK_CIRCLECI_REPO_OPTION);
+    $circleci_job = get_option(BUILD_HOOK_CIRCLECI_JOB_OPTION);
     $settings = get_option(BUILD_HOOK_SETTINGS_OPTION);
     $trigger = get_option(BUILD_HOOK_TRIGGER_OPTION);
     $roles = get_editable_roles();
-
+    
     ?>
       <div class="wrap">
         <h1>Settings</h1>
         ​<hr />
         <h2>Web Hook</h2>
-        <form method="post" action="<?php $_SERVER['PHP_SELF']?>" novalidate="novalidate">
+        <form id="hook_settings_form" method="post" action="<?php $_SERVER['PHP_SELF']?>" novalidate="novalidate">
           <table class="form-table">
             <tbody>
+              <tr>
+                <th scope="row">Type</th>
+                <td>
+                  <fieldset>
+                    <legend class="screen-reader-text">Type</legend>
+                      <select name="<?php echo BUILD_HOOK_TYPE_OPTION ?>" id="build_hooks_type">
+                        <option value="">Select type...</option>
+                        <?php foreach (BUILD_HOOK_TYPES as $key => $value) { ?>
+                          <option value="<?php echo $key ?>" <?php echo $type==$key?'selected':'' ?>><?php echo $value ?></option>
+                        <?php } ?>
+                      </select>
+                  </fieldset>
+                </td>
+              </tr>
+              <?php if($type && $type!= 'circle_ci') : ?>
               <tr>
                 <th scope="row">Webhook</th>
                 <td>
                   <fieldset>
                     <legend class="screen-reader-text">Webhook</legend>
-                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_OPTION ?>" value="<?php echo $url ?>" size="96">
+                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_OPTION.$type ?>" value="<?php echo $url ?>" size="96">
                   </fieldset>
                 </td>
               </tr>
+              <?php endif; ?>
+
+              <?php if($type && $type== 'circle_ci') : ?>
+              <tr>
+                <th scope="row">Repository</th>
+                <td>
+                  <fieldset>
+                    <legend class="screen-reader-text">Repository</legend>
+                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_CIRCLECI_REPO_OPTION ?>" value="<?php echo $circleci_repo ?>" size="96">
+                  </fieldset>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Job</th>
+                <td>
+                  <fieldset>
+                    <legend class="screen-reader-text">Job</legend>
+                      <input type="text" class="full-input" name="<?php echo BUILD_HOOK_CIRCLECI_JOB_OPTION ?>" value="<?php echo $circleci_job ?>" size="96">
+                  </fieldset>
+                </td>
+              </tr>
+              <?php endif; ?>
             </tbody>
           </table>
 
@@ -207,6 +280,13 @@ function build_hooks_settings()
               <input name="submit" id="submit" class="button button-primary" value="Save changes" type="submit">
           </div>
         </form>
+        <script type="text/javascript">
+        jQuery(function($) { 
+          $('#build_hooks_type').on('change', function(){
+            $('#hook_settings_form #submit').click()
+          })
+        });
+        </script>
       </div>
     <?php
 }
