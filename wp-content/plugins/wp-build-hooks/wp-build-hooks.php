@@ -62,11 +62,11 @@ function trigger_option() {
   return in_array(current_user_role(), $trigger);
 }
 
-function get_secret($tokenName) {
+function get_secret($token_name) {
   $secrets_file = file_get_contents(WP_CONTENT_DIR.'/uploads/private/secrets.json');
   $json_data = json_decode($secrets_file, true);
 
-  return $json_data[$tokenName];
+  return $json_data[$token_name];
 }
 
 function circle_ci_options($obfuscate = true) {
